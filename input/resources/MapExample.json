@@ -1,0 +1,629 @@
+{
+  "resourceType": "StructureMap",
+  "id": "MapExample",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2023-04-20T05:16:01.996+00:00"
+  },
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><pre>map &quot;http://hcisolutions.ch/ig/ig-hci-vacd/StructureMap/MapExample&quot; = &quot;MapExample&quot;\r\n\r\n// FHIR Bundle to HCI Form QuestionnaireResponse mapping\r\n// 2022+ Roeland Luykx, copyright HCI Solutions AG\r\n\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/Bundle&quot; alias Bundle as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/Composition&quot; alias Composition as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/Patient&quot; alias Patient as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/Organization&quot; alias Organization as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/Practitioner&quot; alias Practitioner as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/PractitionerRole&quot; alias PractitionerRole as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/BackboneElement&quot; alias BackboneElement as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/Condition&quot; alias Condition as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/Observation&quot; alias Observation as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/Identifier&quot; alias Identifier as source\r\nuses &quot;http://hl7.org/fhir/StructureDefinition/QuestionnaireResponse&quot; alias QuestionnaireResponse as target\r\n\r\nimports &quot;http://hcisolutions.ch/ig/ig-hci-vacd/StructureMap/GenericMapping&quot;\r\n\r\ngroup ImmunizationAdministrationToHciCdsQrFsme(source bundle : Bundle, target qr : QuestionnaireResponse) {\r\n  bundle.id as id -&gt; qr.id = id;\r\n  bundle -&gt; qr.questionnaire = 'http://hcisolutions.ch/ig/ig-hci-vacd/Questionnaire/CdsFSMEForm' &quot;questionnaire&quot;;\r\n  bundle -&gt; qr.status = 'completed' &quot;status&quot;;\r\n  bundle.timestamp as ts -&gt;  qr.meta as meta,  meta.lastUpdated = ts;\r\n  bundle.entry as entry then {\r\n    entry then DoContained(entry, qr) &quot;DoContained&quot;;\r\n  };\r\n  bundle -&gt;  qr.item as item,  item.linkId = 'form',  item.text = 'Vac Check zur Frühsommer-Meningoenzephalitis-Impfung; Triage-Fragebogen zum Vac Check durch Apotheker/innen' then {\r\n    bundle -&gt;  item.item as patientinfo,  patientinfo.linkId = 'form.patientinfo',  patientinfo.text = 'Patientenassoziierte Angaben' then {\r\n      bundle then DoPatinfoFsme(bundle, patientinfo) &quot;DoPatinfo&quot;;\r\n    } &quot;patientinfo&quot;;\r\n    bundle -&gt;  item.item as vaccines,  vaccines.linkId = 'form.vaccines',  vaccines.text = 'Angaben zu bereits erhaltenen Impfdosen' then {\r\n      bundle then DoAdministration(bundle, vaccines) &quot;immmunization&quot;;\r\n    } &quot;vaccines&quot;;\r\n  } &quot;form&quot;;\r\n}\r\n\r\ngroup DoPatinfoFsme(source bundle : Bundle, target patientinfo : BackboneElement) {\r\n  // form.patientinfo.questSocialFacts\r\n  bundle -&gt;  patientinfo.item as questSocial,  questSocial.linkId = 'form.patientinfo.questSocialFacts',  questSocial.text = 'Soziale Faktoren' then {\r\n    // form.patientinfo.questSocialLivingRisk\r\n    bundle -&gt;  patientinfo.item as questSocialLivingRisk,  questSocialLivingRisk.linkId = 'form.patientinfo.questSocialLivingRisk',  questSocialLivingRisk.text = 'Ist der Wohnort oder Aufenthalt innerhalb CH ausser Genf und Tessin? (FSME)',  questSocialLivingRisk.answer as answSocialLivingRisk then {\r\n      // form.patientinfo.questRisks\r\n      bundle -&gt;  patientinfo.item as questRisks,  questRisks.linkId = 'form.patientinfo.questRisks',  questRisks.text = 'Risikofaktoren' then {\r\n        // form.patientinfo.questPregnancy\r\n        bundle -&gt; patientinfo.item as questPregnancy then {\r\n          bundle -&gt;  questPregnancy.linkId = 'form.patientinfo.questPregnancy',  questPregnancy.text = 'Ist die Person schwanger?',  questPregnancy.answer as answPreg then {\r\n            bundle.entry as entry where ($this.resource.ofType(FHIR.Condition)) then {\r\n              entry.resource as resource where ($this.code.coding.code != '77386006') then {\r\n                resource.meta where ($this.profile = 'http://fhir.ch/ig/ch-vacd/StructureDefinition/ch-vacd-medical-problems') then {\r\n                  resource.code as rcode then MedicalProblemsAddToItemSocial(rcode, questSocial) &quot;value&quot;;\r\n                  resource.code as rcode then MedicalProblemsAddToItemRisks(rcode, questRisks) &quot;value&quot;;\r\n                };\r\n              };\r\n              entry.resource as resource where ($this.code.coding.code = '77386006') then {\r\n                entry -&gt; answPreg.value = true &quot;valueBoolean&quot;;\r\n              };\r\n              // HCIC#300005 &quot;residence or stay whole CH except Geneva and Ticino&quot;\r\n              entry.resource as resource where (($this.code.coding.code = '300005') and ($this.code.coding.system = 'http://hcisolutions.ch/ig/ig-hci-vacd/CodeSystem/hci-vacd-cds-cs')) then {\r\n                entry -&gt; answSocialLivingRisk.value = true &quot;valueBoolean&quot;;\r\n              };\r\n            };\r\n          } &quot;answPreg&quot;;\r\n        } &quot;questPregnancy&quot;;\r\n      } &quot;questRisks&quot;;\r\n    } &quot;answSocialLivingRisk&quot;;\r\n  } &quot;questSocial&quot;;\r\n  bundle.entry as entry1 where ($this.resource.ofType(FHIR.AllergyIntolerance)) then {\r\n    bundle -&gt;  patientinfo.item as questAll,  questAll.linkId = 'form.patientinfo.questAllergies',  questAll.text = 'Allergien / UAW' then {\r\n      entry1.resource as res then {\r\n        res.code as code1 then {\r\n          code1.coding as coding1 -&gt;  questAll.answer as answ1,  answ1.value = coding1;\r\n        };\r\n      } &quot;res&quot;;\r\n    } &quot;questAll&quot;;\r\n  };\r\n}\r\n\r\n</pre></div>"
+  },
+  "url": "http://hcisolutions.ch/ig/ig-hci-vacd/StructureMap/MapExample",
+  "name": "MapExample",
+  "description": "FHIR Bundle to HCI Form QuestionnaireResponse mapping\r\n2022+ Roeland Luykx, copyright HCI Solutions AG",
+  "structure": [ {
+    "url": "http://hl7.org/fhir/StructureDefinition/Bundle",
+    "mode": "source",
+    "alias": "Bundle"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/Composition",
+    "mode": "source",
+    "alias": "Composition"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/Patient",
+    "mode": "source",
+    "alias": "Patient"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/Organization",
+    "mode": "source",
+    "alias": "Organization"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/Practitioner",
+    "mode": "source",
+    "alias": "Practitioner"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/PractitionerRole",
+    "mode": "source",
+    "alias": "PractitionerRole"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/BackboneElement",
+    "mode": "source",
+    "alias": "BackboneElement"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/Condition",
+    "mode": "source",
+    "alias": "Condition"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/Observation",
+    "mode": "source",
+    "alias": "Observation"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/Identifier",
+    "mode": "source",
+    "alias": "Identifier"
+  }, {
+    "url": "http://hl7.org/fhir/StructureDefinition/QuestionnaireResponse",
+    "mode": "target",
+    "alias": "QuestionnaireResponse"
+  } ],
+  "import": [ "http://hcisolutions.ch/ig/ig-hci-vacd/StructureMap/GenericMapping" ],
+  "group": [ {
+    "name": "ImmunizationAdministrationToHciCdsQrFsme",
+    "typeMode": "none",
+    "input": [ {
+      "name": "bundle",
+      "type": "Bundle",
+      "mode": "source"
+    }, {
+      "name": "qr",
+      "type": "QuestionnaireResponse",
+      "mode": "target"
+    } ],
+    "rule": [ {
+      "name": "id",
+      "source": [ {
+        "context": "bundle",
+        "element": "id",
+        "variable": "id"
+      } ],
+      "target": [ {
+        "context": "qr",
+        "contextType": "variable",
+        "element": "id",
+        "transform": "copy",
+        "parameter": [ {
+          "valueId": "id"
+        } ]
+      } ]
+    }, {
+      "name": "questionnaire",
+      "source": [ {
+        "context": "bundle"
+      } ],
+      "target": [ {
+        "context": "qr",
+        "contextType": "variable",
+        "element": "questionnaire",
+        "transform": "copy",
+        "parameter": [ {
+          "valueString": "http://hcisolutions.ch/ig/ig-hci-vacd/Questionnaire/CdsFSMEForm"
+        } ]
+      } ]
+    }, {
+      "name": "status",
+      "source": [ {
+        "context": "bundle"
+      } ],
+      "target": [ {
+        "context": "qr",
+        "contextType": "variable",
+        "element": "status",
+        "transform": "copy",
+        "parameter": [ {
+          "valueString": "completed"
+        } ]
+      } ]
+    }, {
+      "name": "timestamp",
+      "source": [ {
+        "context": "bundle",
+        "element": "timestamp",
+        "variable": "ts"
+      } ],
+      "target": [ {
+        "context": "qr",
+        "contextType": "variable",
+        "element": "meta",
+        "variable": "meta"
+      }, {
+        "context": "meta",
+        "contextType": "variable",
+        "element": "lastUpdated",
+        "transform": "copy",
+        "parameter": [ {
+          "valueId": "ts"
+        } ]
+      } ]
+    }, {
+      "name": "entry",
+      "source": [ {
+        "context": "bundle",
+        "element": "entry",
+        "variable": "entry"
+      } ],
+      "rule": [ {
+        "name": "DoContained",
+        "source": [ {
+          "context": "entry"
+        } ],
+        "dependent": [ {
+          "name": "DoContained",
+          "variable": [ "entry", "qr" ],
+          "_variable": [ {
+            "extension": [ {
+              "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+              "valueUrl": "id"
+            } ]
+          }, {
+            "extension": [ {
+              "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+              "valueUrl": "id"
+            } ]
+          } ]
+        } ]
+      } ]
+    }, {
+      "name": "form",
+      "source": [ {
+        "context": "bundle"
+      } ],
+      "target": [ {
+        "context": "qr",
+        "contextType": "variable",
+        "element": "item",
+        "variable": "item"
+      }, {
+        "context": "item",
+        "contextType": "variable",
+        "element": "linkId",
+        "transform": "copy",
+        "parameter": [ {
+          "valueString": "form"
+        } ]
+      }, {
+        "context": "item",
+        "contextType": "variable",
+        "element": "text",
+        "transform": "copy",
+        "parameter": [ {
+          "valueString": "Vac Check zur Frühsommer-Meningoenzephalitis-Impfung; Triage-Fragebogen zum Vac Check durch Apotheker/innen"
+        } ]
+      } ],
+      "rule": [ {
+        "name": "patientinfo",
+        "source": [ {
+          "context": "bundle"
+        } ],
+        "target": [ {
+          "context": "item",
+          "contextType": "variable",
+          "element": "item",
+          "variable": "patientinfo"
+        }, {
+          "context": "patientinfo",
+          "contextType": "variable",
+          "element": "linkId",
+          "transform": "copy",
+          "parameter": [ {
+            "valueString": "form.patientinfo"
+          } ]
+        }, {
+          "context": "patientinfo",
+          "contextType": "variable",
+          "element": "text",
+          "transform": "copy",
+          "parameter": [ {
+            "valueString": "Patientenassoziierte Angaben"
+          } ]
+        } ],
+        "rule": [ {
+          "name": "DoPatinfo",
+          "source": [ {
+            "context": "bundle"
+          } ],
+          "dependent": [ {
+            "name": "DoPatinfoFsme",
+            "variable": [ "bundle", "patientinfo" ],
+            "_variable": [ {
+              "extension": [ {
+                "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+                "valueUrl": "id"
+              } ]
+            }, {
+              "extension": [ {
+                "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+                "valueUrl": "id"
+              } ]
+            } ]
+          } ]
+        } ]
+      }, {
+        "name": "vaccines",
+        "source": [ {
+          "context": "bundle"
+        } ],
+        "target": [ {
+          "context": "item",
+          "contextType": "variable",
+          "element": "item",
+          "variable": "vaccines"
+        }, {
+          "context": "vaccines",
+          "contextType": "variable",
+          "element": "linkId",
+          "transform": "copy",
+          "parameter": [ {
+            "valueString": "form.vaccines"
+          } ]
+        }, {
+          "context": "vaccines",
+          "contextType": "variable",
+          "element": "text",
+          "transform": "copy",
+          "parameter": [ {
+            "valueString": "Angaben zu bereits erhaltenen Impfdosen"
+          } ]
+        } ],
+        "rule": [ {
+          "name": "immmunization",
+          "source": [ {
+            "context": "bundle"
+          } ],
+          "dependent": [ {
+            "name": "DoAdministration",
+            "variable": [ "bundle", "vaccines" ],
+            "_variable": [ {
+              "extension": [ {
+                "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+                "valueUrl": "id"
+              } ]
+            }, {
+              "extension": [ {
+                "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+                "valueUrl": "id"
+              } ]
+            } ]
+          } ]
+        } ]
+      } ]
+    } ]
+  }, {
+    "name": "DoPatinfoFsme",
+    "typeMode": "none",
+    "input": [ {
+      "name": "bundle",
+      "type": "Bundle",
+      "mode": "source"
+    }, {
+      "name": "patientinfo",
+      "type": "BackboneElement",
+      "mode": "target"
+    } ],
+    "rule": [ {
+      "name": "questSocial",
+      "source": [ {
+        "context": "bundle"
+      } ],
+      "target": [ {
+        "context": "patientinfo",
+        "contextType": "variable",
+        "element": "item",
+        "variable": "questSocial"
+      }, {
+        "context": "questSocial",
+        "contextType": "variable",
+        "element": "linkId",
+        "transform": "copy",
+        "parameter": [ {
+          "valueString": "form.patientinfo.questSocialFacts"
+        } ]
+      }, {
+        "context": "questSocial",
+        "contextType": "variable",
+        "element": "text",
+        "transform": "copy",
+        "parameter": [ {
+          "valueString": "Soziale Faktoren"
+        } ]
+      } ],
+      "rule": [ {
+        "name": "answSocialLivingRisk",
+        "source": [ {
+          "context": "bundle"
+        } ],
+        "target": [ {
+          "context": "patientinfo",
+          "contextType": "variable",
+          "element": "item",
+          "variable": "questSocialLivingRisk"
+        }, {
+          "context": "questSocialLivingRisk",
+          "contextType": "variable",
+          "element": "linkId",
+          "transform": "copy",
+          "parameter": [ {
+            "valueString": "form.patientinfo.questSocialLivingRisk"
+          } ]
+        }, {
+          "context": "questSocialLivingRisk",
+          "contextType": "variable",
+          "element": "text",
+          "transform": "copy",
+          "parameter": [ {
+            "valueString": "Ist der Wohnort oder Aufenthalt innerhalb CH ausser Genf und Tessin? (FSME)"
+          } ]
+        }, {
+          "context": "questSocialLivingRisk",
+          "contextType": "variable",
+          "element": "answer",
+          "variable": "answSocialLivingRisk"
+        } ],
+        "rule": [ {
+          "name": "questRisks",
+          "source": [ {
+            "context": "bundle"
+          } ],
+          "target": [ {
+            "context": "patientinfo",
+            "contextType": "variable",
+            "element": "item",
+            "variable": "questRisks"
+          }, {
+            "context": "questRisks",
+            "contextType": "variable",
+            "element": "linkId",
+            "transform": "copy",
+            "parameter": [ {
+              "valueString": "form.patientinfo.questRisks"
+            } ]
+          }, {
+            "context": "questRisks",
+            "contextType": "variable",
+            "element": "text",
+            "transform": "copy",
+            "parameter": [ {
+              "valueString": "Risikofaktoren"
+            } ]
+          } ],
+          "rule": [ {
+            "name": "questPregnancy",
+            "source": [ {
+              "context": "bundle"
+            } ],
+            "target": [ {
+              "context": "patientinfo",
+              "contextType": "variable",
+              "element": "item",
+              "variable": "questPregnancy"
+            } ],
+            "rule": [ {
+              "name": "answPreg",
+              "source": [ {
+                "context": "bundle"
+              } ],
+              "target": [ {
+                "context": "questPregnancy",
+                "contextType": "variable",
+                "element": "linkId",
+                "transform": "copy",
+                "parameter": [ {
+                  "valueString": "form.patientinfo.questPregnancy"
+                } ]
+              }, {
+                "context": "questPregnancy",
+                "contextType": "variable",
+                "element": "text",
+                "transform": "copy",
+                "parameter": [ {
+                  "valueString": "Ist die Person schwanger?"
+                } ]
+              }, {
+                "context": "questPregnancy",
+                "contextType": "variable",
+                "element": "answer",
+                "variable": "answPreg"
+              } ],
+              "rule": [ {
+                "name": "entry",
+                "source": [ {
+                  "context": "bundle",
+                  "element": "entry",
+                  "variable": "entry",
+                  "condition": "($this.resource.ofType(FHIR.Condition))"
+                } ],
+                "rule": [ {
+                  "name": "resource",
+                  "source": [ {
+                    "context": "entry",
+                    "element": "resource",
+                    "variable": "resource",
+                    "condition": "($this.code.coding.code != '77386006')"
+                  } ],
+                  "rule": [ {
+                    "name": "meta",
+                    "source": [ {
+                      "context": "resource",
+                      "element": "meta",
+                      "condition": "($this.profile = 'http://fhir.ch/ig/ch-vacd/StructureDefinition/ch-vacd-medical-problems')"
+                    } ],
+                    "rule": [ {
+                      "name": "value",
+                      "source": [ {
+                        "context": "resource",
+                        "element": "code",
+                        "variable": "rcode"
+                      } ],
+                      "dependent": [ {
+                        "name": "MedicalProblemsAddToItemSocial",
+                        "variable": [ "rcode", "questSocial" ],
+                        "_variable": [ {
+                          "extension": [ {
+                            "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+                            "valueUrl": "id"
+                          } ]
+                        }, {
+                          "extension": [ {
+                            "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+                            "valueUrl": "id"
+                          } ]
+                        } ]
+                      } ]
+                    }, {
+                      "name": "value",
+                      "source": [ {
+                        "context": "resource",
+                        "element": "code",
+                        "variable": "rcode"
+                      } ],
+                      "dependent": [ {
+                        "name": "MedicalProblemsAddToItemRisks",
+                        "variable": [ "rcode", "questRisks" ],
+                        "_variable": [ {
+                          "extension": [ {
+                            "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+                            "valueUrl": "id"
+                          } ]
+                        }, {
+                          "extension": [ {
+                            "url": "http://hl7.org/fhir/tools/StructureDefinition/original-item-type",
+                            "valueUrl": "id"
+                          } ]
+                        } ]
+                      } ]
+                    } ]
+                  } ]
+                }, {
+                  "name": "resource",
+                  "source": [ {
+                    "context": "entry",
+                    "element": "resource",
+                    "variable": "resource",
+                    "condition": "($this.code.coding.code = '77386006')"
+                  } ],
+                  "rule": [ {
+                    "name": "valueBoolean",
+                    "source": [ {
+                      "context": "entry"
+                    } ],
+                    "target": [ {
+                      "context": "answPreg",
+                      "contextType": "variable",
+                      "element": "value",
+                      "transform": "copy",
+                      "parameter": [ {
+                        "valueBoolean": true
+                      } ]
+                    } ]
+                  } ]
+                }, {
+                  "name": "resource",
+                  "source": [ {
+                    "context": "entry",
+                    "element": "resource",
+                    "variable": "resource",
+                    "condition": "(($this.code.coding.code = '300005') and ($this.code.coding.system = 'http://hcisolutions.ch/ig/ig-hci-vacd/CodeSystem/hci-vacd-cds-cs'))"
+                  } ],
+                  "rule": [ {
+                    "name": "valueBoolean",
+                    "source": [ {
+                      "context": "entry"
+                    } ],
+                    "target": [ {
+                      "context": "answSocialLivingRisk",
+                      "contextType": "variable",
+                      "element": "value",
+                      "transform": "copy",
+                      "parameter": [ {
+                        "valueBoolean": true
+                      } ]
+                    } ]
+                  } ],
+                  "documentation": "HCIC#300005 \"residence or stay whole CH except Geneva and Ticino\""
+                } ]
+              } ]
+            } ],
+            "documentation": "form.patientinfo.questPregnancy"
+          } ],
+          "documentation": "form.patientinfo.questRisks"
+        } ],
+        "documentation": "form.patientinfo.questSocialLivingRisk"
+      } ],
+      "documentation": "form.patientinfo.questSocialFacts"
+    }, {
+      "name": "entry",
+      "source": [ {
+        "context": "bundle",
+        "element": "entry",
+        "variable": "entry1",
+        "condition": "($this.resource.ofType(FHIR.AllergyIntolerance))"
+      } ],
+      "rule": [ {
+        "name": "questAll",
+        "source": [ {
+          "context": "bundle"
+        } ],
+        "target": [ {
+          "context": "patientinfo",
+          "contextType": "variable",
+          "element": "item",
+          "variable": "questAll"
+        }, {
+          "context": "questAll",
+          "contextType": "variable",
+          "element": "linkId",
+          "transform": "copy",
+          "parameter": [ {
+            "valueString": "form.patientinfo.questAllergies"
+          } ]
+        }, {
+          "context": "questAll",
+          "contextType": "variable",
+          "element": "text",
+          "transform": "copy",
+          "parameter": [ {
+            "valueString": "Allergien / UAW"
+          } ]
+        } ],
+        "rule": [ {
+          "name": "res",
+          "source": [ {
+            "context": "entry1",
+            "element": "resource",
+            "variable": "res"
+          } ],
+          "rule": [ {
+            "name": "code",
+            "source": [ {
+              "context": "res",
+              "element": "code",
+              "variable": "code1"
+            } ],
+            "rule": [ {
+              "name": "coding",
+              "source": [ {
+                "context": "code1",
+                "element": "coding",
+                "variable": "coding1"
+              } ],
+              "target": [ {
+                "context": "questAll",
+                "contextType": "variable",
+                "element": "answer",
+                "variable": "answ1"
+              }, {
+                "context": "answ1",
+                "contextType": "variable",
+                "element": "value",
+                "transform": "copy",
+                "parameter": [ {
+                  "valueId": "coding1"
+                } ]
+              } ]
+            } ]
+          } ]
+        } ]
+      } ]
+    } ]
+  } ]
+}

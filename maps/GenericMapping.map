@@ -1,0 +1,411 @@
+map "http://hcisolutions.ch/ig/ig-hci-vacd/StructureMap/GenericMapping" = "GenericMapping"
+
+// FHIR Bundle to HCI Form QuestionnaireResponse mapping
+// 2021-10-21 Roeland Luykx, copyright HCI Solutions AG
+
+uses "http://hl7.org/fhir/StructureDefinition/Bundle" alias Bundle as source
+uses "http://hl7.org/fhir/StructureDefinition/Composition" alias Composition as source
+uses "http://hl7.org/fhir/StructureDefinition/Patient" alias Patient as source
+uses "http://hl7.org/fhir/StructureDefinition/Organization" alias Organization as source
+uses "http://hl7.org/fhir/StructureDefinition/Practitioner" alias Practitioner as source
+uses "http://hl7.org/fhir/StructureDefinition/PractitionerRole" alias PractitionerRole as source
+uses "http://hl7.org/fhir/StructureDefinition/BackboneElement" alias BackboneElement as source
+uses "http://hl7.org/fhir/StructureDefinition/Condition" alias Condition as source
+uses "http://hl7.org/fhir/StructureDefinition/Observation" alias Observation as source
+uses "http://hl7.org/fhir/StructureDefinition/Identifier" alias Identifier as source
+
+
+uses "http://hl7.org/fhir/StructureDefinition/QuestionnaireResponse" alias QuestionnaireResponse as target
+
+
+//group DoAdministrationBasicImmunization(source bundle : Bundle, source section : BackboneElement, target vaccines : BackboneElement) {
+group DoAdministrationBasicImmunization(source bundle : Bundle, target vaccines : BackboneElement) {
+  // section.entry as secBaIm /*where ($this.type = 'Condition')*/ then {
+    // secBaIm.reference as ref then {
+      //bundle.entry as entry1 where ($this.resource.ofType(FHIR.Condition) and $this.fullUrl = ref) then {
+      bundle.entry as entry1 where ($this.resource.ofType(FHIR.Condition)) then {
+        entry1.resource as resource then {
+          resource.code as code where ($this.coding.code = 'cds-dtpa-basicimmun') then {
+            resource -> vaccines.item as vaccEntry then {
+            
+              code -> vaccEntry.linkId ="form.vaccines.questBasicImmunDtpa",
+                vaccEntry.text =  "Alle Impfungen gegen DTPa in der Kindheit erhalten.",
+                vaccEntry.answer as answer, answer.value = true "answer";
+            } "vaccEntry";
+          } "code";
+
+          resource.code as code where ($this.coding.code = 'cds-polio-basicimmun') then {
+            resource -> vaccines.item as vaccEntry then {
+              code -> vaccEntry.linkId ="form.vaccines.questBasicImmunPolio",
+                vaccEntry.text =  "Alle Impfungen gegen Poliomyelitis in der Kindheit erhalten.",
+                vaccEntry.answer as answer, answer.value = true "answer";
+            } "vaccEntry";
+          } "code";
+
+        } "resource";
+      } "entry1";
+
+  //  } "ref";
+  //} "secBaIm";
+}
+
+
+//group DoAdministration(source bundle : Bundle, source section : BackboneElement, target vaccines : BackboneElement) {
+group DoAdministration(source bundle : Bundle, target vaccines : BackboneElement) {
+  //section.entry as secBaIm /*where ($this.type = 'Condition')*/ then {
+    //secBaIm.reference as ref then {
+     
+
+      // bundle.entry as entry1 where ($this.resource.ofType(FHIR.Immunization) and $this.fullUrl = ref) then {
+      bundle.entry as entry1 where ($this.resource.ofType(FHIR.Immunization)) then {
+        entry1.resource as resource then {
+          resource -> vaccines.item as vaccEntry then {
+            resource -> vaccEntry.linkId ="form.vaccines.entry" "linkId";
+            resource -> vaccEntry.text =  "Impfung" "text";
+            resource.vaccineCode as vaccCode then {
+              vaccCode.coding as vaccCoding then {
+              vaccCode -> vaccEntry.item as vaccItem,
+                vaccItem.linkId = "form.vaccines.questVaccineProduct",
+                vaccItem.text = "Impfstoff",
+                vaccItem.answer as answer,
+                  answer.value = vaccCoding "vaccItem";
+              } "vaccCoding";
+            } "vaccCode";
+            resource.occurrenceDateTime as vaccDate then {
+              vaccDate -> vaccEntry.item as vaccItem,
+              vaccItem.linkId = "form.vaccines.questVaccinationDate",
+                vaccItem.text = "Impfdatum",
+                vaccItem.answer as answer,
+                  // answer.value = vaccDate 
+                  answer.value = create('date') as dt , dt.value = vaccDate "vaccDate";
+            } "vaccDate";
+          } "vaccEntry";
+        } "resource";
+      } "entry1";
+
+    //} "ref";
+ //} "secBaIm";
+}
+
+group MedicalProblemsAddToItemSocial(source rcode : CodeableConcept, target questSocial : BackboneElement) {
+  rcode.coding as coding where ($this.system = 'http://snomed.info/sct') then {
+    // Social
+    coding.code as code where ( $this.value = '169449001' or $this.value = '224224003' or $this.value = '105568001') then {
+      code -> questSocial.answer as answr, answr.value = coding "answr";
+    } "code";
+  } "codingsct";
+
+  rcode.coding as coding where ($this.system = 'http://hcisolutions.ch/ig/ig-hci-vacd/CodeSystem/hci-vacd-cds-cs') then {
+    // Social
+    coding.code as code where ( $this.value = '300001' or $this.value = '300002' or $this.value = '300003' or $this.value = '300005') then {
+      code -> questSocial.answer as answr, answr.value = coding "coding";
+    } "code";
+
+  } "codinghci";
+}
+
+group MedicalProblemsAddToItemPreillness(source rcode : CodeableConcept, target questPreIllnesses : BackboneElement) {
+  rcode.coding as coding where ($this.system = 'http://snomed.info/sct') then {
+    // PrevIllness
+    coding.code as code where ( $this.value = '42261000195101' or $this.value = '42251000195104' or $this.value = '449840001' or $this.value = '50043002' or $this.value = '737294004' or $this.value = '51244008' or $this.value = '230744007' or $this.value = '363346000' or $this.value = '51655004' or $this.value = '235856003' or $this.value = '402196005' or $this.value = '90708001' or $this.value = '414029004' or $this.value = '56265001' or $this.value = '75934005' or $this.value = '34093004' or $this.value = '24063002' ) then {
+      code -> questPreIllnesses.answer as answr, answr.value = coding "answr";
+    } "code";
+  } "codingsct";
+  rcode.coding as coding where ($this.system = 'http://hcisolutions.ch/ig/ig-hci-vacd/CodeSystem/hci-vacd-cds-cs') then {
+
+  } "codinghci";
+}
+
+group MedicalProblemsAddToItemRisks(source rcode : CodeableConcept, target questRisks : BackboneElement) {
+  rcode.coding as coding where ($this.system = 'http://snomed.info/sct') then {
+    // Riskfactor
+    coding.code as code where ( $this.value = '226034001' or $this.value = '102947004' or $this.value = '305679000' or $this.value = '305679000' or $this.value = '1237016007' or $this.value = '305679000' or $this.value = '1237016007' or $this.value = '1237017003' or $this.value = '1237018008' or $this.value = '1237022003' or $this.value = '1237019000' or $this.value = '1237020006' or $this.value = '1237021005' or $this.value = '1237023008' or $this.value = '1237024002' or $this.value = '1237025001' or $this.value = '1237026000' or $this.value = '1237027009' or $this.value = '1237028004' or $this.value = '1237029007' or $this.value = '1237030002' ) then {
+      code -> questRisks.answer as answr, answr.value = coding "answr";
+    } "code";
+  } "codingsct";
+  rcode.coding as coding where ($this.system = 'http://hcisolutions.ch/ig/ig-hci-vacd/CodeSystem/hci-vacd-cds-cs') then {
+    // Riskfactor
+    coding.code as code where ( $this.value = '200001' or $this.value = '200002' or $this.value = '200003' or $this.value = '200005' or $this.value = '200022' or $this.value = '200023') then {
+      code -> questRisks.answer as answr, answr.value = coding "answr";
+    } "code";
+  } "codinghci";
+}
+
+group MedicalProblemsAddToItemOccupation(source rcode : CodeableConcept, target questOccupation : BackboneElement) {
+  rcode.coding as coding where ($this.system = 'http://snomed.info/sct') then {
+    // Profession
+    coding.code as code where ( $this.value = '310183005' or $this.value = '160157004' or $this.value = '265940000' or $this.value = '61246008') then {
+      code -> questOccupation.answer as answr, answr.value = coding "answr";
+    } "code";
+  } "codingsct";
+  rcode.coding as coding where ($this.system = 'http://hcisolutions.ch/ig/ig-hci-vacd/CodeSystem/hci-vacd-cds-cs') then {
+    // Profession
+    coding.code as code where ( $this.value = '100001' or $this.value = '100002' or  $this.value = '100003') then {
+      code -> questOccupation.answer as answr, answr.value = coding "coding";
+    } "code";    
+  } "codinghci";
+}
+
+
+// group MedicalProblemsAddToItem(source rcode : CodeableConcept, target questSocial : BackboneElement, target questPreIllnesses : BackboneElement, target questRisks : BackboneElement, target questOccupation : BackboneElement) {
+
+//   // Note: in place of or chaining a resolution of the categorie using a concept map would be nice. mappig does not yet have this functionality
+
+//   rcode.coding as coding where ($this.system = 'http://snomed.info/sct') then {
+
+//     // Riskfactor
+//     coding.code as code where ( $this.value = '226034001' or $this.value = '102947004' or $this.value = '305679000' or $this.value = '305679000' or $this.value = '1237016007' or $this.value = '305679000' or $this.value = '1237016007' or $this.value = '1237017003' or $this.value = '1237018008' or $this.value = '1237022003' or $this.value = '1237019000' or $this.value = '1237020006' or $this.value = '1237021005' or $this.value = '1237023008' or $this.value = '1237024002' or $this.value = '1237025001' or $this.value = '1237026000' or $this.value = '1237027009' or $this.value = '1237028004' or $this.value = '1237029007' or $this.value = '1237030002' ) then {
+//        code -> questRisks.answer as answr, answr.value = coding "answr";
+//     } "code";
+
+//     // PrevIllness
+//     coding.code as code where ( $this.value = '42261000195101' or $this.value = '42251000195104' or $this.value = '449840001' or $this.value = '50043002' or $this.value = '737294004' or $this.value = '51244008' or $this.value = '230744007' or $this.value = '363346000' or $this.value = '51655004' or $this.value = '235856003' or $this.value = '402196005' or $this.value = '90708001' or $this.value = '414029004' or $this.value = '56265001' or $this.value = '75934005' or $this.value = '34093004' or $this.value = '24063002' ) then {
+//       code -> questPreIllnesses.answer as answr, answr.value = coding "answr";
+//     } "code";
+
+//     // Social
+//     coding.code as code where ( $this.value = '169449001' or $this.value = '224224003' or $this.value = '105568001') then {
+//       code -> questSocial.answer as answr, answr.value = coding "answr";
+//     } "code";
+
+
+//     // Profession
+//     coding.code as code where ( $this.value = '310183005' or $this.value = '160157004' or $this.value = '265940000' or $this.value = '61246008') then {
+//       code -> questOccupation.answer as answr, answr.value = coding "answr";
+//     } "code";
+
+//   } "codingsct";
+
+//   rcode.coding as coding where ($this.system = 'http://hcisolutions.ch/ig/ig-hci-vacd/CodeSystem/hci-vacd-cds-cs') then {
+
+//     // Riskfactor
+//     coding.code as code where ( $this.value = '200001' or $this.value = '200002' or $this.value = '200003' or $this.value = '200005' or $this.value = '200022' or $this.value = '200023') then {
+//       code -> questRisks.answer as answr, answr.value = coding "answr";
+//    } "code";
+
+//     // Social
+//     coding.code as code where ( $this.value = '300001' or $this.value = '300002' or $this.value = '300003' or $this.value = '300005') then {
+//        code -> questSocial.answer as answr, answr.value = coding "coding";
+//     } "code";
+
+//     // Profession
+//     coding.code as code where ( $this.value = '100001' or $this.value = '100002' or  $this.value = '100003') then {
+//       code -> questOccupation.answer as answr, answr.value = coding "coding";
+//    } "code";
+
+//   } "codinghci";
+
+//   // rcode.coding as coding -> translate(coding, 'http://hcisolutions.ch/ig/ig-hci-vacd/ConceptMap/hci-vacd-medicalrisks-riskcategories-cm', 'CodeableConcept') as displ,
+//   //     questOccupation.answer as answr,
+//   //       answr.value = displ "translate";
+  
+// }
+
+
+group DoContained(source entry : BackboneElement, target qr : QuestionnaireResponse) {
+  entry.fullUrl as fullUrl then {
+
+    entry.resource as patient where $this.ofType(FHIR.Patient) then {
+      patient -> qr.contained = patient as pat, pat.id = fullUrl, 
+        qr.subject = create('Reference') as reference, reference.reference = (%pat.id) "pat";
+    } "patient";
+
+    entry.resource as practitionerrole where $this.ofType(FHIR.PractitionerRole) then {
+      practitionerrole -> qr.contained = practitionerrole as pr, pr.id = fullUrl, qr.author = create('Reference') as reference, reference.reference = (%pr.id)  "pr";
+    } "practitionerrole";
+
+    entry.resource as practitioner where $this.ofType(FHIR.Practitioner) then {
+      practitioner -> qr.contained = practitioner as pra, pra.id = fullUrl "pract";
+    } "practitioner";
+
+    entry.resource as organization where $this.ofType(FHIR.Organization) then {
+      organization -> qr.contained = organization as org, org.id = fullUrl "org";
+    } "organization";
+  } "fullUrl";
+}
+
+group DoTiterAndIllnesses(source bundle : Bundle, target titerandillnesses : BackboneElement) {
+  // Lab results
+  //Observation
+  //meta.profile.value = 'http://fhir.ch/ig/ch-vacd/StructureDefinition/ch-vacd-laboratory-serology',
+  bundle.entry as entry where ($this.resource.ofType(FHIR.Observation)) then {
+    entry.resource as resource then {
+      //  resource.meta where ($this.profile = 'http://fhir.ch/ig/ch-vacd/StructureDefinition/ch-vacd-laboratory-serology') then {
+
+        resource.code as cc then {
+          resource.value as value then {
+
+              //form.patientinfo.questHibKnownTiter
+              // -- form.patientinfo.questHibKnownTiterUnk
+              cc.coding as coding where ($this.system = 'http://loinc.org' and $this.code= '22755-3') then {
+                value.value as valQu -> titerandillnesses.item as hibTit,
+                  hibTit.linkId = "form.patientinfo.questHibKnownTiter",
+                  hibTit.text = "Hämophilus influenzae Typ b (mg/l)",
+                  hibTit.answer as answ, answ.value = valQu "value";
+              } "coding";
+
+              //form.patientinfo.questVarizKnownTiter
+              // -- form.patientinfo.questVarizKnownTiterUnk
+              cc.coding as coding where ($this.system = 'http://loinc.org' and $this.code= '22602-7') then {
+                value.value as valQu -> titerandillnesses.item as hibTit,
+                  hibTit.linkId = "form.patientinfo.questVarizKnownTiter",
+                  hibTit.text = "Varizellen (IU/l)",
+                  hibTit.answer as answ, answ.value = valQu "value";
+              } "coding";
+
+
+              //form.patientinfo.questHepBAntibodyTiter
+              // -- form.patientinfo.questHepBAntibodyTiterUnk
+              cc.coding as coding where ($this.system = 'http://loinc.org' and $this.code= '16935-9') then {
+                value.value as valQu -> titerandillnesses.item as hibTit,
+                  hibTit.linkId = "form.patientinfo.questHepBAntibodyTiter",
+                  hibTit.text = "Hepatitis B (IU/l)",
+                  hibTit.answer as answ, answ.value = valQu "value";
+              } "coding";
+
+
+              // form.patientinfo.questTwutAntibodyTiter
+              // --  form.patientinfo.questTwutAntibodyTiterUnk
+              cc.coding as coding where ($this.system = 'http://loinc.org' and $this.code= '14128-3') then {
+                value.value as valQu -> titerandillnesses.item as hibTit,
+                  hibTit.linkId = "form.patientinfo.questTwutAntibodyTiter",
+                  hibTit.text = "Tollwut (IU/ml)",
+                  hibTit.answer as answ, answ.value = valQu "value";
+              } "coding";
+
+
+              } "value";
+
+            } "cc";
+          // } "profile";
+        } "resource";
+      } "entry";
+
+      // pastillnesses
+      // Condition
+      // meta.profile.value = 'http://fhir.ch/ig/ch-vacd/StructureDefinition/ch-vacd-pastillnesses',
+      bundle.entry as entry where ($this.resource.ofType(FHIR.Condition)) then {
+        entry.resource as resource then {
+          // resource.meta where ($this.profile = 'http://fhir.ch/ig/ch-vacd/StructureDefinition/ch-vacd-pastillnesses') then {
+            
+            
+            resource.code as cc then {
+              // form.patientinfo.questVarizIllUndergone
+              cc.coding as coding where ($this.system = 'http://snomed.info/sct' and $this.code= '38907003') then {
+                coding -> titerandillnesses.item as illUnder,
+                  illUnder.linkId = "form.patientinfo.questVarizIllUndergone",
+                  illUnder.text = "Wurde bereits eine Varizellen-Erkrankung durchgemacht?",
+                  illUnder.answer as answ, answ.value = true "value";
+              } "coding";
+              // form.patientinfo.questRubeusIllUndergone
+              cc.coding as coding where ($this.system = 'http://snomed.info/sct' and $this.code= '36653000') then {
+                coding -> titerandillnesses.item as illUnder,
+                  illUnder.linkId = "form.patientinfo.questRubeusIllUndergone",
+                  illUnder.text = "",
+                  illUnder.answer as answ, answ.value = true "value";
+              } "coding";
+
+              // form.patientinfo.questMeasleIllUndergone
+              cc.coding as coding where ($this.system = 'http://snomed.info/sct' and $this.code= '14189004') then {
+                coding -> titerandillnesses.item as illUnder,
+                  illUnder.linkId = "form.patientinfo.questMeasleIllUndergone",
+                  illUnder.text = "",
+                  illUnder.answer as answ, answ.value = true "value";
+              } "coding";
+              // form.patientinfo.questHepAIllUndergone
+              cc.coding as coding where ($this.system = 'http://snomed.info/sct' and $this.code= '40468003') then {
+                coding -> titerandillnesses.item as illUnder,
+                  illUnder.linkId = "form.patientinfo.questHepAIllUndergone",
+                  illUnder.text = "Wurde bereits eine Hepatitis A-Erkrankung durchgemacht?",
+                  illUnder.answer as answ, answ.value = true "value";
+              } "coding";
+              // form.patientinfo.questHepBIllUndergone
+              cc.coding as coding where ($this.system = 'http://snomed.info/sct' and $this.code= '66071002') then {
+                coding -> titerandillnesses.item as illUnder,
+                  illUnder.linkId = "form.patientinfo.questHepBIllUndergone",
+                  illUnder.text = "Wurde bereits eine Hepatitis B-Erkrankung durchgemacht?",
+                  illUnder.answer as answ, answ.value = true "value";
+              } "coding";
+            } "cc";
+           
+          // } "profile";
+        } "resource";
+      } "entry";
+}
+
+group DoPatinfoGeneric(source bundle : Bundle, target patientinfo : BackboneElement) {
+  //form.patientinfo.questSocialFacts
+  bundle -> patientinfo.item as questSocial then {
+    bundle -> questSocial.linkId ="form.patientinfo.questSocialFacts", questSocial.text =  "Soziale Faktoren" "linkIdtext";
+
+    //form.patientinfo.questSocialLivingRisk
+    bundle -> patientinfo.item as questSocialLivingRisk then {
+      bundle -> questSocialLivingRisk.linkId ="form.patientinfo.questSocialLivingRisk", 
+        questSocialLivingRisk.text =  "Ist der Wohnort oder Aufenthalt innerhalb CH ausser Genf und Tessin? (FSME)",
+        questSocialLivingRisk.answer as answSocialLivingRisk then {
+   
+
+    //form.patientinfo.questPreIllnesses
+    bundle -> patientinfo.item as questPreIllnesses then {
+      bundle -> questPreIllnesses.linkId ="form.patientinfo.questPreIllnesses", questPreIllnesses.text =  "Vorerkrankungen" "linkIdtext";
+   
+      //form.patientinfo.questRisks
+      bundle -> patientinfo.item as questRisks then {
+        bundle -> questRisks.linkId ="form.patientinfo.questRisks", questRisks.text =  "Risikofaktoren" "linkIdtext";
+
+        //form.patientinfo.questPregnancy
+        bundle -> patientinfo.item as questPregnancy then {
+          bundle -> questPregnancy.linkId ="form.patientinfo.questPregnancy", questPregnancy.text =  "Ist die Person schwanger?",
+            questPregnancy.answer as answPreg /*, answPreg.value = false*/ then {
+
+          //form.patientinfo.questOccupation
+          bundle -> patientinfo.item as questOccupation then {
+            bundle -> questOccupation.linkId ="form.patientinfo.questOccupation", questOccupation.text =  "Beruf" "linkIdtext";
+
+            bundle.entry as entry where ($this.resource.ofType(FHIR.Condition)) then {
+                entry.resource as resource where ($this.code.coding.code != '77386006' and $this.code.coding.code != '300005') then {
+                  // resource.meta where ($this.profile = 'http://fhir.ch/ig/ch-vacd/StructureDefinition/ch-vacd-medical-problems') then {
+                    resource.code as rcode then MedicalProblemsAddToItemSocial(rcode , questSocial) "value";
+                    resource.code as rcode then MedicalProblemsAddToItemPreillness(rcode , questPreIllnesses) "value";
+                    resource.code as rcode then MedicalProblemsAddToItemRisks(rcode , questRisks) "value";
+                    resource.code as rcode then MedicalProblemsAddToItemOccupation(rcode , questOccupation) "value";            
+
+                // }"meta";
+                  } "resource";
+                  entry.resource as resource where ($this.code.coding.code = '77386006' and $this.code.coding.system = 'http://snomed.info/sct' ) then {
+                    entry -> answPreg.value =  true "valueBoolean";
+                  } "resource";
+                  //HCIC#300005 "residence or stay whole CH except Geneva and Ticino"
+                  entry.resource as resource where ($this.code.coding.code = '300005' and $this.code.coding.system = 'http://hcisolutions.ch/ig/ig-hci-vacd/CodeSystem/hci-vacd-cds-cs') then {
+                    entry -> answSocialLivingRisk.value =  true "valueBoolean";
+                  } "resource";
+              
+                } "entry";
+
+              } "questOccupation";
+            }"answPreg";
+          } "questPregnancy";
+        } "questRisks";
+      } "questPreIllnesses";
+    } "answSocialLivingRisk";
+    } "questSocialLivingRisk";
+  } "questSocial";
+
+  //form.patientinfo.questVivoVaccineReceived
+  // keine infos im austaschformat ch-vacd
+
+  //form.patientinfo.questAllergies
+  bundle.entry as entry1 where ($this.resource.ofType(FHIR.AllergyIntolerance)) then {
+    bundle -> patientinfo.item as questAll then {
+      bundle -> questAll.linkId ="form.patientinfo.questAllergies" "linkId";
+      bundle -> questAll.text =  "Allergien / UAW" "text";
+      
+        entry1.resource as res then {
+          res.code as code1 then {
+            code1.coding as coding1 -> questAll.answer as answ1, 
+              answ1.value = coding1 "coding";
+          } "code";   
+        } "res";
+    } "questAll";
+  }"entry";
+}
