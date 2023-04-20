@@ -1,0 +1,2 @@
+# Example IG for StructureMaps
+
